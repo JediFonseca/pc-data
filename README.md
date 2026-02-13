@@ -2,6 +2,8 @@
 
 ***English information down below.***
 
+<img width="812" height="794" alt="Captura_de_tela-07" src="https://github.com/user-attachments/assets/78ebaa86-bfae-4692-84df-283641fd37a9" />
+
 # To Do:
 
 - Implementar informações de RAM, GPU, placa mãe, BIOS e etc;
