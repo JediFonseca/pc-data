@@ -47,7 +47,7 @@ sudo clear
 while true; do
 
 
-    CPUTEMP=$(sensors | grep "Tctl:" | awk '{print $2}' | tr -d '+')
+    CPUTEMP=$(sensors | grep -E "Tctl:|Package id 0:" | awk '{print $4 ? $4 : $2}' | tr -d '+')
     CLOCK=$(grep "cpu MHz" /proc/cpuinfo | head -n1 | cut -d: -f2 | sed -e 's/^[ \t]*//')
     MULTIPLIER=$(grep "cpu MHz" /proc/cpuinfo | head -n1 | cut -d: -f2 | awk '{printf "x%.1f\n", $1/100}')
 
