@@ -5,6 +5,7 @@
 # To Do:
 
 - Implementar informações de RAM, GPU, placa mãe, BIOS e etc;
+- Tradução para português;
 - Desenvolver uma GUI (interface gráfica) em Qt ou GTK.
 
 Script simples para mostrar informações do hardware no Linux.
@@ -34,6 +35,7 @@ Alguns comandos, como o `dmidecode` exigem autenticação com `sudo` para funcio
 ## To Do:
 
 - Implement RAM, GPU, Motherboard, and BIOS information;
+- Translation to portuguese;
 - Develop a GUI (Graphical User Interface) using Qt or GTK.
 
 ## Dependencies:
