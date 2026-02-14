@@ -20,7 +20,7 @@ Os pacotes necessários para usar esse script são (nomes baseados nos repositó
 - util-linux;
 - dmidecode;
 - lm-sensors;
-- grep, sed, awk and coreutils (probably installed by default on any distro).
+- grep, sed, awk and coreutils (provavelmente instalados por padrão em qualquer distro).
 
 ## Como usar:
 
