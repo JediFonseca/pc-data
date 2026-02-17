@@ -4,11 +4,16 @@ Script simples para mostrar informações do hardware no Linux.
 
 ***English information down below.***
 
-<img width="812" height="794" alt="Captura_de_tela-07" src="https://github.com/user-attachments/assets/78ebaa86-bfae-4692-84df-283641fd37a9" />
+<img width="600" height="422" alt="Captura_de_tela-12" src="https://github.com/user-attachments/assets/8d247d7a-0d63-4bcc-a2e2-6e8cba31f36f" />
+
+<img width="617" height="568" alt="Captura_de_tela-13" src="https://github.com/user-attachments/assets/c4cda18d-ae52-43b0-a6a6-683bf241b0da" />
+
+<img width="592" height="630" alt="Captura_de_tela-14" src="https://github.com/user-attachments/assets/91955584-db9e-42ef-bdd2-ae04172bdf4f" />
+
 
 # Planos:
 
-- Implementar informações de RAM, GPU, placa mãe, BIOS e etc;
+- Implementar informações de GPU, placa mãe, BIOS e etc;
 - Tradução para português;
 - Desenvolver uma GUI (interface gráfica).
 
@@ -26,7 +31,8 @@ Os pacotes necessários para usar esse script são (nomes baseados nos repositó
 
 1. Salve o script em qualquer pasta no seu PC;
 2. Dê permissão de execução via "propriedades" no gerenciador de arquivos com o comando `chmod +x pcdata.sh`;
-3. Abra o terminal, navegue até a pasta onde o script se encontra e execute-o com `./pcdata.sh`.
+3. Abra o terminal, navegue até a pasta onde o script se encontra e execute-o com `./pcdata.sh`;
+4. Para ajuda e informações avançadas utilize as flags "--help", "--ram" e "--cpu".
 
 ## Informações extras:
 
@@ -36,7 +42,7 @@ Alguns comandos, como o `dmidecode` exigem autenticação com `sudo` para funcio
 
 ## To Do:
 
-- Implement RAM, GPU, Motherboard, and BIOS information;
+- Implement GPU, Motherboard, and BIOS information;
 - Translation to portuguese;
 - Develop a GUI (Graphical User Interface).
 
@@ -55,7 +61,8 @@ The packages needed to be able to use this script are (names based on the Debian
 
 1. Save the script to any folder on your PC;
 2. Grant execution permission via the file manager's "Properties" or by using the command `chmod +x pcdata.sh`;
-3. Open the terminal, navigate to the folder where the script is located, and run it with `./pcdata.sh`.
+3. Open the terminal, navigate to the folder where the script is located, and run it with `./pcdata.sh`;
+4. For help and advanced usage use the flags "--help", "--ram" and "--cpu".
 
 ## Extra information:
 
