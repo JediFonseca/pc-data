@@ -7,6 +7,7 @@
 # util-linux
 # dmidecode
 # lm-sensors
+# upower
 # grep, sed, awk and coreutils (probably installed by default on any distro).
 
 # Colors:
@@ -31,6 +32,12 @@ case "$1" in
     echo -e "--cpu: for advanced CPU information."
     echo -e "--ram: for advanced RAM information."
 
+    echo -e "\n${BLUE}DEPENDENCIES:${NOCOLOR}"
+    echo -e "${BLUE}For this script to work properly, you'll need the following packages:${NOCOLOR}"
+    echo -e "dmidecode, lm-sensors, util-linux, upower and pciutils. (Package names based on Debian 13.)"
+    echo "All of them are default on many distros, including Debian, but you may need to"
+    echo "install some of them manually, specially in more minimalistic distros."
+
     ;;
 
     "--cpu") # BEGINNING OF THE "--cpu" FLAG CODE.
@@ -45,12 +52,15 @@ case "$1" in
         MODELNAME=$(grep -m1 "model name" /proc/cpuinfo | cut -d: -f2 | sed -e 's/^[ \t]*//')
         CORES=$(lscpu | grep "Core(s) per socket:" | awk '{print $4}')
         THREADS=$(lscpu | grep "^CPU(s):" | head -n1 | awk '{print $2}')
+        GOVERNOR=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)
         SOCKET=$(sudo dmidecode -t processor | grep "Upgrade:" | cut -d: -f2 | sed -e 's/^[ \t]*//')
         VOLTAGE=$(sudo dmidecode -t processor | grep "Voltage" | sed 's/.*: *//')
         FAMILYNUMBER=$(grep -m1 "cpu family" /proc/cpuinfo | cut -d: -f2 | sed -e 's/^[ \t]*//')
-        MODELNUMBER=$(grep -m1 "model" /proc/cpuinfo | cut -d: -f2 | grep -v "name" | sed -e 's/^[ \t]*//')
+        MODELNUMBER=$(grep "^model" /proc/cpuinfo | grep -v "model name" | head -n1 | cut -d: -f2 | sed 's/^[ \t]*//')
         STEPPING=$(grep -m1 "stepping" /proc/cpuinfo | cut -d: -f2 | sed -e 's/^[ \t]*//')
-        INSTRUCTIONS=$(lscpu | grep -E "Flags|Options" | grep -iowE "mmx|sse|sse2|sse3|ssse3|sse4_1|sse4_2|avx|avx2|avx512|fma|aes|sha|vmx|svm|lm" | tr '[:lower:]' '[:upper:]' | tr '_' '.' | sort -u | xargs | sed 's/ /, /g')
+        INSTRUCTIONS=$(lscpu | grep -E "Flags|Options" \
+            | grep -iowE "mmx|sse|sse2|sse3|ssse3|sse4_1|sse4_2|avx|avx2|avx512|fma|aes|sha|vmx|svm|lm" \
+            | tr '[:lower:]' '[:upper:]' | tr '_' '.' | sort -u | xargs | sed 's/ /, /g')
         MAXCLOCK=$(sudo dmidecode -t processor | grep "Max Speed" | sed 's/.*: *//')
         CACHEL1D=$(lscpu | grep -E "L1d" | sed 's/.*: *//')
         CACHEL1I=$(lscpu | grep -E "L1i" | sed 's/.*: *//')
@@ -59,14 +69,15 @@ case "$1" in
 
         # Formatting output and loop for the realtime information.
 
-        clear
-
     while true; do
 
         # Variables for the realtime information.
-        CPUTEMP=$(sensors | grep -E "Tctl:|Package id 0:" | awk '{print $4 ? $4 : $2}' | tr -d '+') && CPUTEMP=${CPUTEMP:-"N/A (Run the 'sensors-detect' command)"}
+        CPUTEMP=$(sensors | grep -E "Tctl:|Package id 0:" | awk '{print $4 ? $4 : $2}' \
+            | tr -d '+') && CPUTEMP=${CPUTEMP:-"N/A (Install 'lm_sensors' and run the 'sensors-detect' command.)"}
         CLOCK=$(grep "cpu MHz" /proc/cpuinfo | head -n1 | cut -d: -f2 | sed -e 's/^[ \t]*//')
         MULTIPLIER=$(grep "cpu MHz" /proc/cpuinfo | head -n1 | cut -d: -f2 | awk '{printf "x%.1f\n", $1/100}')
+
+        clear
 
         tput cup 0 0
 
@@ -77,6 +88,7 @@ case "$1" in
         echo -e "Model Name:                   $MODELNAME"
         echo -e "Number of Cores:              $CORES"
         echo -e "Number of Threads:            $THREADS"
+        echo -e "Governor (Power mode):        $GOVERNOR"
         echo -e "Socket:                       $SOCKET"
         echo -e "Default Voltage:              $VOLTAGE"
         echo -e "Family Number:                $FAMILYNUMBER"
@@ -105,65 +117,127 @@ case "$1" in
 
         echo -e "${YELLOW}This script requires administrator privileges to read hardware data.${NOCOLOR}"
 
-        sudo -v || { echo -e "${BLUE}Authentication failed!${NOCOLOR}"; exit 1; }
+        sudo -v || { echo -e "${RED}Authentication failed!${NOCOLOR}"; exit 1; }
 
         # Defining variables.
 
+        MEMCMD=$(sudo dmidecode -t 17)
+
         # RAM size per slot, from 1 to 6:
-        MEMSIZE01=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==2 {print}' | grep -w "Size:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
-        MEMSIZE02=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==3 {print}' | grep -w "Size:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
-        MEMSIZE03=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==4 {print}' | grep -w "Size:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
-        MEMSIZE04=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==5 {print}' | grep -w "Size:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
-        MEMSIZE05=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==6 {print}' | grep -w "Size:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
-        MEMSIZE06=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==7 {print}' | grep -w "Size:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSIZE01=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==2 {print}' | grep -w "Size:" \
+            | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSIZE02=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==3 {print}' | grep -w "Size:" \
+            | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSIZE03=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==4 {print}' | grep -w "Size:" \
+            | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSIZE04=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==5 {print}' | grep -w "Size:" \
+            | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSIZE05=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==6 {print}' | grep -w "Size:" \
+            | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSIZE06=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==7 {print}' | grep -w "Size:" \
+            | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
 
         # Memory type per slot, from 1 to 6:
-        MEMTYPE01=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==2 {print}' | grep -w "Type:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
-        MEMTYPE02=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==3 {print}' | grep -w "Type:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
-        MEMTYPE03=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==4 {print}' | grep -w "Type:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
-        MEMTYPE04=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==5 {print}' | grep -w "Type:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
-        MEMTYPE05=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==6 {print}' | grep -w "Type:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
-        MEMTYPE06=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==7 {print}' | grep -w "Type:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMTYPE01=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==2 {print}' | grep -w "Type:" \
+            | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMTYPE02=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==3 {print}' | grep -w "Type:" \
+            | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMTYPE03=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==4 {print}' | grep -w "Type:" \
+            | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMTYPE04=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==5 {print}' | grep -w "Type:" \
+            | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMTYPE05=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==6 {print}' | grep -w "Type:" \
+            | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMTYPE06=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==7 {print}' | grep -w "Type:" \
+            | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
 
         # Memory speed per slot, from 1 to 6:
-        MEMSPEED01=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==2 {print}' | grep -w "Speed:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
-        MEMSPEED02=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==3 {print}' | grep -w "Speed:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
-        MEMSPEED03=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==4 {print}' | grep -w "Speed:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
-        MEMSPEED04=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==5 {print}' | grep -w "Speed:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
-        MEMSPEED05=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==6 {print}' | grep -w "Speed:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
-        MEMSPEED06=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==7 {print}' | grep -w "Speed:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSPEED01=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==2 {print}' \
+            | grep -w "Speed:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSPEED02=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==3 {print}' \
+            | grep -w "Speed:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSPEED03=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==4 {print}' \
+            | grep -w "Speed:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSPEED04=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==5 {print}' \
+            | grep -w "Speed:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSPEED05=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==6 {print}' \
+            | grep -w "Speed:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSPEED06=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==7 {print}' | grep -w "Speed:" \
+            | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
 
         # Memory default voltage per slot, from 1 to 6:
-        MEMVOLTAGE01=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==2 {print}' | grep "Configured Voltage:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
-        MEMVOLTAGE02=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==3 {print}' | grep "Configured Voltage:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
-        MEMVOLTAGE03=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==4 {print}' | grep "Configured Voltage:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
-        MEMVOLTAGE04=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==5 {print}' | grep "Configured Voltage:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
-        MEMVOLTAGE05=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==6 {print}' | grep "Configured Voltage:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
-        MEMVOLTAGE06=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==7 {print}' | grep "Configured Voltage:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMVOLTAGE01=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==2 {print}' \
+            | grep "Configured Voltage:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMVOLTAGE02=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==3 {print}' \
+            | grep "Configured Voltage:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMVOLTAGE03=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==4 {print}' \
+            | grep "Configured Voltage:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMVOLTAGE04=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==5 {print}' \
+            | grep "Configured Voltage:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMVOLTAGE05=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==6 {print}' \
+            | grep "Configured Voltage:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMVOLTAGE06=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==7 {print}' \
+            | grep "Configured Voltage:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
 
         # Memory serial number per slot, from 1 to 6:
-        MEMSN01=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==2 {print}' | grep "Serial Number:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
-        MEMSN02=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==3 {print}' | grep "Serial Number:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
-        MEMSN03=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==4 {print}' | grep "Serial Number:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
-        MEMSN04=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==5 {print}' | grep "Serial Number:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
-        MEMSN05=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==6 {print}' | grep "Serial Number:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
-        MEMSN06=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==7 {print}' | grep "Serial Number:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSN01=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==2 {print}' \
+            | grep "Serial Number:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSN02=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==3 {print}' \
+            | grep "Serial Number:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSN03=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==4 {print}' \
+            | grep "Serial Number:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSN04=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==5 {print}' \
+            | grep "Serial Number:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSN05=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==6 {print}' \
+            | grep "Serial Number:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMSN06=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==7 {print}' \
+            | grep "Serial Number:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
 
         # Memory part number per slot, from 1 to 6:
-        MEMPN01=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==2 {print}' | grep "Part Number:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
-        MEMPN02=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==3 {print}' | grep "Part Number:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
-        MEMPN03=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==4 {print}' | grep "Part Number:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
-        MEMPN04=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==5 {print}' | grep "Part Number:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
-        MEMPN05=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==6 {print}' | grep "Part Number:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
-        MEMPN06=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==7 {print}' | grep "Part Number:" | grep -vE "Unknown|No Module Installed" | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMPN01=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==2 {print}' \
+            | grep "Part Number:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMPN02=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==3 {print}' \
+            | grep "Part Number:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMPN03=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==4 {print}' \
+            | grep "Part Number:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMPN04=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==5 {print}' \
+            | grep "Part Number:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMPN05=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==6 {print}' \
+            | grep "Part Number:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
+        MEMPN06=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==7 {print}' \
+            | grep "Part Number:" | grep -vE "Unknown|No Module Installed" \
+            | head -n1 | awk '{$1=""; $2=""; print $0}' | sed 's/^[ \t]*//')
 
         # Memory Form Factor per slot, from 1 to 6:
-        MEMFF01=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==2 {print}' | grep "Form Factor:" | grep -v "Unknown" | awk '{print $3}')
-        MEMFF02=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==3 {print}' | grep "Form Factor:" | grep -v "Unknown" | awk '{print $3}')
-        MEMFF03=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==4 {print}' | grep "Form Factor:" | grep -v "Unknown" | awk '{print $3}')
-        MEMFF04=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==5 {print}' | grep "Form Factor:" | grep -v "Unknown" | awk '{print $3}')
-        MEMFF05=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==6 {print}' | grep "Form Factor:" | grep -v "Unknown" | awk '{print $3}')
-        MEMFF06=$(sudo dmidecode -t 17 | awk 'BEGIN{RS="Memory Device"} NR==7 {print}' | grep "Form Factor:" | grep -v "Unknown" | awk '{print $3}')
+        MEMFF01=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==2 {print}' \
+            | grep "Form Factor:" | grep -v "Unknown" | awk '{print $3}')
+        MEMFF02=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==3 {print}' \
+            | grep "Form Factor:" | grep -v "Unknown" | awk '{print $3}')
+        MEMFF03=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==4 {print}' \
+            | grep "Form Factor:" | grep -v "Unknown" | awk '{print $3}')
+        MEMFF04=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==5 {print}' \
+            | grep "Form Factor:" | grep -v "Unknown" | awk '{print $3}')
+        MEMFF05=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==6 {print}' \
+            | grep "Form Factor:" | grep -v "Unknown" | awk '{print $3}')
+        MEMFF06=$(echo "$MEMCMD" | awk 'BEGIN{RS="Memory Device"} NR==7 {print}' \
+            | grep "Form Factor:" | grep -v "Unknown" | awk '{print $3}')
 
         # Formatting output
 
@@ -237,10 +311,19 @@ case "$1" in
         UPTIME=$(uptime -p | sed 's/up //')
         SHELLNAME=$(echo "${SHELL##*/} $( $SHELL --version | grep -oE '[0-9]+\.[0-9.]+' | head -n1 )")
         CPUNAME=$(grep -m1 "model name" /proc/cpuinfo | cut -d: -f2 | sed -e 's/^[ \t]*//')
-        GPUNAME=$(lspci | grep -i 'vga' | sed -E 's/.*\[(.*)\].*/\1/')
+        GPUNAME=$(lspci | grep -iE 'vga|3d|display' | sed -E 's/.*\[(.*)\].*/\1/' | xargs | sed 's/ /, /g')
         TOTALRAM=$(free -k | grep "Mem:" | awk '{printf "%.1f GiB\n", $2/1024/1024}')
         TOTALSWAP=$(free -h | awk '/^Swap:/ {print $2}')
-        MYDISKS=$(df -h --output=target,used,size,pcent | grep -E '^/( |mnt)' | awk '{printf "Disk (%s): %s / %s (%s)\n", $1, $2, $3, $4}')
+        MYDISKS=$(df -h --output=source,used,size,pcent,target,fstype | grep "^/dev/" \
+            | sed 's/  */,/g; s/,fuseblk/,ntfs/g; s/,ntfs3/,ntfs/g' \
+            | awk -v color="$BLUE" -v nc="$NOCOLOR" -F, \
+            '{printf "%sDisk (%s):%s %s / %s (%s) em %s [%s]\n", color, $1, nc, $2, $3, $4, $5, $6}')
+        MYMONITORS=$(xrandr --query 2>/dev/null | awk -v color="$BLUE" -v \
+            nc="$NOCOLOR" '/ connected/ {p=$1} /\*/ {res=$1; freq=$2; gsub(/[*+]/, "", \
+            freq); printf "%s%s:%s %s @ %sHz\n", color, p, nc, res, freq}')
+        MYIP=$(ip -br addr show | grep UP | awk '{print $3}' | cut -d/ -f1)
+        VIDEODRIVER=$(lspci -k | grep -EiA 3 "vga|video|3d" | grep "in use" | sed 's/.*: //')
+        IFBAT=$(upower -i $(upower -e 2>/dev/null | grep 'BAT') 2>/dev/null | grep 'percentage' | awk '{print $2}')
 
         # Formatting output
 
@@ -254,12 +337,16 @@ case "$1" in
         echo -e "${BLUE}Uptime:${NOCOLOR} $UPTIME"
         echo -e "${BLUE}Shell:${NOCOLOR} $SHELLNAME"
         echo -e "${BLUE}CPU:${NOCOLOR} $CPUNAME"
-        echo -e "${BLUE}GPU:${NOCOLOR} $GPUNAME"
         echo -e "${BLUE}Total RAM:${NOCOLOR} $TOTALRAM"
-        echo -e "${BLUE}Total Swap:${NOCOLOR} $TOTALSWAP"
-        echo -e "${BLUE}My disks and partitions:${NOCOLOR}"
+        echo -e "${BLUE}Total swap:${NOCOLOR} $TOTALSWAP"
+        echo -e "${BLUE}GPU:${NOCOLOR} $GPUNAME"
+        echo -e "${BLUE}Video driver in use:${NOCOLOR} $VIDEODRIVER"
+        echo -e "$MYMONITORS"
+        echo -e "${BLUE}Local IP:${NOCOLOR} $MYIP"
+        [[ -n "$IFBAT" ]] && echo -e "${BLUE}Battery percentage:${NOCOLOR} $IFBAT"
         echo -e "$MYDISKS"
 
-        echo -e "\n${YELLOW}Run \"./pcdata.sh --help\" fore more information on how to use it.${NOCOLOR}"
+
+        echo -e "\n${YELLOW}Run \"./pcdata.sh --help\" for dependencies and more information on how to use it.${NOCOLOR}"
         ;;
 esac
